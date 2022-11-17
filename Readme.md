@@ -1,4 +1,4 @@
-# Ticket Reservation System
+# Flight Ticket Reservation System Documentation
 
 # Installation
 Clone the repository
@@ -7,12 +7,12 @@ git clone git@github.com:MikeDrag/ticket_reservation_system.git
 ```
 ### Link to repo https://github.com/MikeDrag/ticket_reservation_system
 
-##### Make sure you have php 7.4 or up to version 8.1 installed 
+##### Make sure you have php 7.4 installed (.php-version file(7.4.32))
 
 ## Install composer packages
 Run ```composer install```
 
-## Create local environment file
+## Create a local environment file
 ```Create .env.local and add your local configuration```
 
 Example:  ```DATABASE_URL="mysql://root:root@127.0.0.1:3306/flight_reservation_system?serverVersion=8&charset=utf8mb4"``` Replace root with your database user/password and flight_reservation_ticket with your database name
@@ -33,6 +33,15 @@ Example:  ```DATABASE_URL="mysql://root:root@127.0.0.1:3306/flight_reservation_s
 
 
 # Using the API
+
+## List tickets
+**Route**: `api/ticket/list`
+___
+Parameters(optional): `ticket_id`,
+___
+Request method: `GET`
+___
+Usage: Send a get request `api/ticket/list` to list tickets. If you want to list a specific ticket add a parameter(ticket_id) and the id of the ticket.
 
 ## Create a ticket
 **Route**: `api/ticket/create`

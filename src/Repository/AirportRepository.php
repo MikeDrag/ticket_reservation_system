@@ -1,43 +1,43 @@
 <?php
 
-namespace App\Repository;
+	namespace App\Repository;
 
-use App\Entity\Airport;
-use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
-use Doctrine\Persistence\ManagerRegistry;
+	use App\Entity\Airport;
+	use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+	use Doctrine\Persistence\ManagerRegistry;
 
-/**
- * @extends ServiceEntityRepository<Airport>
- *
- * @method Airport|null find($id, $lockMode = null, $lockVersion = null)
- * @method Airport|null findOneBy(array $criteria, array $orderBy = null)
- * @method Airport[]    findAll()
- * @method Airport[]    findBy(array $criteria, array $orderBy = null, $limit = null, $offset = null)
- */
-class AirportRepository extends ServiceEntityRepository
-{
-    public function __construct(ManagerRegistry $registry)
-    {
-        parent::__construct($registry, Airport::class);
-    }
+	/**
+	 * @extends ServiceEntityRepository<Airport>
+	 *
+	 * @method Airport|null find($id, $lockMode = null, $lockVersion = null)
+	 * @method Airport|null findOneBy(array $criteria, array $orderBy = null)
+	 * @method Airport[]    findAll()
+	 * @method Airport[]    findBy(array $criteria, array $orderBy = null, $limit = null, $offset = null)
+	 */
+	class AirportRepository extends ServiceEntityRepository
+	{
+		public function __construct(ManagerRegistry $registry)
+		{
+			parent::__construct($registry, Airport::class);
+		}
 
-    public function add(Airport $entity, bool $flush = false): void
-    {
-        $this->getEntityManager()->persist($entity);
+		public function add(Airport $entity, bool $flush = false): void
+		{
+			$this->getEntityManager()->persist($entity);
 
-        if ($flush) {
-            $this->getEntityManager()->flush();
-        }
-    }
+			if ($flush) {
+				$this->getEntityManager()->flush();
+			}
+		}
 
-    public function remove(Airport $entity, bool $flush = false): void
-    {
-        $this->getEntityManager()->remove($entity);
+		public function remove(Airport $entity, bool $flush = false): void
+		{
+			$this->getEntityManager()->remove($entity);
 
-        if ($flush) {
-            $this->getEntityManager()->flush();
-        }
-    }
+			if ($flush) {
+				$this->getEntityManager()->flush();
+			}
+		}
 
 //    /**
 //     * @return Airport[] Returns an array of Airport objects
@@ -63,4 +63,4 @@ class AirportRepository extends ServiceEntityRepository
 //            ->getOneOrNullResult()
 //        ;
 //    }
-}
+	}

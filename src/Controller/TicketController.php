@@ -2,6 +2,7 @@
 
 	namespace App\Controller;
 
+	use App\Service\ResponseMessageService;
 	use App\Service\TicketService;
 	use Exception;
 	use Psr\Log\LoggerInterface;
@@ -10,6 +11,9 @@
 	use Symfony\Component\HttpFoundation\Request;
 	use Symfony\Component\Routing\Annotation\Route;
 
+	/**
+	 * Manages flight tickets
+	 */
 	class TicketController extends AbstractController
 	{
 		/**
@@ -17,35 +21,57 @@
 		 */
 		private $logger;
 
-		public function __construct(LoggerInterface $logger)
+		/**
+		 * @var ResponseMessageService
+		 */
+		private $codeMessage;
+
+		public function __construct(LoggerInterface $logger, ResponseMessageService $responseMessageService)
 		{
 			$this->logger = $logger;
+			$this->codeMessage = $responseMessageService;
 		}
 
 		/**
-		 * Create a flight ticket
+		 * List ticket(s)
+		 *
+		 * @Route("api/ticket/list", name="list_tickets", methods={"GET"})
+		 *
+		 */
+		public function list(Request $request, TicketService $ticketService): JsonResponse
+		{
+			if ($request->query->get('ticket_id'))
+			{
+				$ticket = $ticketService->getTicketById($request->get('ticket_id'));
+				if (!$ticket)
+					return $ticketService->returnErrorResponse($this->codeMessage->getErrorMessage(10));
+				$ticket[0]['flight_status'] = (($ticket[0]['flight_status'] ? 'Active' : 'Cancelled'));
+
+				return $this->json(['data' => $ticket]);
+			}
+			else
+			{
+				$tickets = $ticketService->getTickets();
+				return $this->json(['data' => $tickets]);
+			}
+		}
+
+		/**
+		 * Create a ticket
 		 *
 		 * @Route("api/ticket/create", name="create_ticket", methods={"POST"})
 		 *
-		 * @throws Exception
 		 */
-		public function createTicket(Request $request, TicketService $ticketService): JsonResponse
+		public function createTicket(TicketService $ticketService)
 		{
 			try
 			{
-				if ($ticketService->create())
-				{
-					return $this->returnSuccessResponse('Ticket created successfully');
-				}
-				else
-				{
-					$this->logger->error('Failed to save ticket into database', ['ticket_creation_failed']);
-					throw new Exception('Something went wrong, please try later again...');
-				}
+				return $ticketService->create();
 			}
-			catch (Exception $exception)
+			catch(Exception $exception)
 			{
-				return $this->returnErrorResponse($exception->getMessage());
+				$this->logger->error($exception->getMessage());
+				return $this->json('Oops something went wrong..', 500);
 			}
 		}
 
@@ -62,12 +88,12 @@
 		{
 			try
 			{
-				$ticketService->cancel();
-				return $this->returnSuccessResponse('Ticket cancelled successfully');
+				return $ticketService->returnSuccessResponse($ticketService->cancel());
 			}
 			catch (Exception $e)
 			{
-				return $this->returnErrorResponse($e->getMessage());
+				$this->logger->error(sprintf($this->codeMessage->getErrorMessage(13) . '. Reason %s', $e->getMessage()), ['ticket_creation_failed']);
+				return $ticketService->returnErrorResponse($e->getMessage());
 			}
 		}
 
@@ -82,25 +108,14 @@
 		 */
 		public function changeSeatTicket(TicketService $ticketService): JsonResponse
 		{
-
 			try
 			{
-				$ticketService->changeSeat();
-				return $this->returnSuccessResponse('Ticket seat changed successfully');
+				return $ticketService->changeSeat();
 			}
-			catch (Exception $e)
+			catch(Exception $exception)
 			{
-				return $this->returnErrorResponse($e->getMessage());
+				$this->logger->error($exception->getMessage());
+				return $this->json('Oops something went wrong..', 500);
 			}
-		}
-
-		public function returnSuccessResponse(string $message): JsonResponse
-		{
-			return $this->json(['success' => $message]);
-		}
-
-		public function returnErrorResponse(string $message): JsonResponse
-		{
-			return $this->json(['error' => $message]);
 		}
 	}

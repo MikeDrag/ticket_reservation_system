@@ -6,7 +6,9 @@
 	use Doctrine\ORM\Mapping as ORM;
 
 	/**
+	 * @ORM\Entity
 	 * @ORM\Entity(repositoryClass=TicketRepository::class)
+	 * @ORM\Table(name="ticket")
 	 */
 	class Ticket
 	{
@@ -51,6 +53,11 @@
 		 * @ORM\Column(type="boolean")
 		 */
 		private $flight_status;
+
+		/**
+		 * @ORM\Column(type="string")
+		 */
+		private $flightID;
 
 
 		public function __construct()
@@ -131,6 +138,18 @@
 		public function setFlightStatus(bool $flight_status): self
 		{
 			$this->flight_status = $flight_status;
+
+			return $this;
+		}
+
+		public function getFlightID(): ?string
+		{
+			return $this->flightID;
+		}
+
+		public function setFlightID(string $flightID): self
+		{
+			$this->flightID = $flightID;
 
 			return $this;
 		}

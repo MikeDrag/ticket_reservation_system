@@ -18,7 +18,7 @@
 			$this->entityManager = $entityManager;
 		}
 
-		public function add(Airport $fromAirport, Airport $toAirport, int $passengerSeat, $departureTime, string $passengerPassportID): bool
+		public function add(Airport $fromAirport, Airport $toAirport, int $passengerSeat, $departureTime, string $passengerPassportID, $flightId): bool
 		{
 			$ticket = new Ticket();
 			$ticket->setFromAirport($fromAirport);
@@ -26,6 +26,7 @@
 			$ticket->setPassengerSeat($passengerSeat);
 			$ticket->setDepartureTime(new \DateTime($departureTime));
 			$ticket->setPassengerPassportID(trim($passengerPassportID));
+			$ticket->setFlightID($flightId);
 			$this->entityManager->persist($ticket);
 			$this->entityManager->flush();
 			if ($this->entityManager->contains($ticket))
@@ -35,7 +36,7 @@
 
 		public function setCancelled(Ticket $ticket)
 		{
-			$ticket->setFlightStatus(0);
+			$ticket->setFlightStatus(Ticket::FLIGHT_STATUS_CANCELLED);
 			$this->entityManager->persist($ticket);
 			$this->entityManager->flush();
 		}

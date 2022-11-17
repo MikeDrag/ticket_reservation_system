@@ -6,12 +6,14 @@
 	use App\Entity\Ticket;
 	use App\Factory\TicketFactory;
 	use Doctrine\ORM\EntityManagerInterface;
+	use Symfony\Component\HttpFoundation\JsonResponse;
 	use Symfony\Component\HttpFoundation\RequestStack;
-	use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 	class TicketService
 	{
-		const AITA_NUMBER_LENGTH = 3;
+		const AITA_LENGTH = 3;
+		const MINIMUM_SEAT_NUMBER = 1;
+		const MAXIMUM_SEAT_NUMBER = 32;
 
 		/**
 		 * @var RequestStack
@@ -25,77 +27,148 @@
 		 * @var TicketFactory
 		 */
 		private $ticketFactory;
+		/**
+		 * @var ResponseMessageService
+		 */
+		private $codeMessage;
 
-		public function __construct(RequestStack $requestStack, EntityManagerInterface $entityManager, TicketFactory $ticketFactory)
+		public function __construct(RequestStack $requestStack, EntityManagerInterface $entityManager, TicketFactory $ticketFactory, ResponseMessageService $responseMessageService)
 		{
 			$this->requestStack = $requestStack;
 			$this->entityManager = $entityManager;
 			$this->ticketFactory = $ticketFactory;
+			$this->codeMessage = $responseMessageService;
 		}
 
-		/**
-		 * @throws \Exception
-		 */
+/*		private function ticketEntity()
+		{
+			return $this->entityManager->getRepository(Ticket::class);
+		}
+*/
+
+		public function getTickets()
+		{
+			return $this->entityManager->getRepository(Ticket::class)->getAllTickets();
+		}
+
+		public function getTicketById($id)
+		{
+			return $this->entityManager->getRepository(Ticket::class)->getTicket($id);
+		}
+
 		public function create()
 		{
 			$request = $this->requestStack->getCurrentRequest();
-			$departureTime = date("Y-m-d H:i:s", strtotime('+' . mt_rand(0, 30) . ' days'));
-			$passengerSeat = rand(1, 32);
-			if (!$request->request->get("from_airport"))
-				throw new NotFoundHttpException('Source airport missing. Please provide source airport.');
-			if (!$request->request->get("to_airport"))
-				throw new NotFoundHttpException('Destination airport missing. Please provide destination airport.');
-			if (!$request->request->get("passenger_passport_id"))
-				throw new NotFoundHttpException('Passenger\'s passport ID missing. Please provide passengers passport ID.');
-
-			if (strlen($request->request->get("from_airport")) != self::AITA_NUMBER_LENGTH || strlen($request->request->get("to_airport")) != self::AITA_NUMBER_LENGTH)
-				throw new NotFoundHttpException('One of your AITA codes is wrong. Please make sure you provide the correct AITA code for your source and destination flight.');
-
-			// TODO: Add validation for the passenger's passport id
-
+			$passengerSeat = rand(self::MINIMUM_SEAT_NUMBER, self::MAXIMUM_SEAT_NUMBER);
+			if ($errorFound = $this->validatePostData($request)) {
+				return self::returnErrorResponse($errorFound);
+			}
+			$departureTime = date('Y-m-d H:i:s', intval($request->request->get("departure_time")));
+			if (!$this->validateDateTime($departureTime, 'Y-m-d H:i:s'))
+				return self::returnErrorResponse($this->codeMessage->getErrorMessage(25));
 			$toAirport = $this->entityManager->getRepository(Airport::class)->findOneBy(['iata' => $request->request->get("to_airport")]);
 			$fromAirport = $this->entityManager->getRepository(Airport::class)->findOneBy(['iata' => $request->request->get("from_airport")]);
 			$passengerPassportID = $request->request->get("passenger_passport_id");
+			$departureTime = date('Y-m-d H:i:s', intval($request->request->get("departure_time")));
+			if (isset($fromAirport) && isset($toAirport) && isset($passengerPassportID))
+			{
+				$getTicketsWithSameFlight = $this->entityManager->getRepository(Ticket::class)->findBy(['flightID' => md5($fromAirport->getIata() . $toAirport->getIata() . strtotime($departureTime))]);
+				if ($getTicketsWithSameFlight) {
+					$flightSeats = [];
+					foreach ($getTicketsWithSameFlight as $ticket) {
+						$flightSeats[] = $ticket->getPassengerSeat();
+					}
+					$i = 0;
+					while (in_array($passengerSeat, $flightSeats)) {
+						$i++;
+						$passengerSeat = rand(self::MINIMUM_SEAT_NUMBER, self::MAXIMUM_SEAT_NUMBER);
+						if ($i > self::MAXIMUM_SEAT_NUMBER) {
+							return self::returnErrorResponse($this->codeMessage->getErrorMessage(29));
+						}
+					}
+				}
+				$flightId = md5($fromAirport->getIata() . $toAirport->getIata() . strtotime($departureTime));
 
-			if (isset($fromAirport) && isset($toAirport))
-				return $this->ticketFactory->add($fromAirport, $toAirport, $passengerSeat, $departureTime, $passengerPassportID);
+				$this->ticketFactory->add($fromAirport, $toAirport, $passengerSeat, $departureTime, $passengerPassportID, $flightId);
+
+				return self::returnSuccessResponse($this->codeMessage->getSuccessMessage(50));
+			}
 			else
-				throw new \Exception('Source or destination missing. Please try again with valid data.');
+				return self::returnErrorResponse($this->codeMessage->getErrorMessage(28));
 		}
 
 		public function cancel()
 		{
 			$request = $this->requestStack->getCurrentRequest();
 			if (!$request->request->get("ticket_id"))
-				throw new NotFoundHttpException('Ticket id is empty. Please enter a valid ticket id');
+				return self::returnErrorResponse($this->codeMessage->getErrorMessage(27));
 			else {
 				$ticket = $this->entityManager->getRepository(Ticket::class)->findOneBy(['id' => $request->get('ticket_id')]);
 				if ($ticket) {
 					if ($ticket->isFlightStatus() == 0)
-						throw new \Exception('Ticket is already cancelled');
-					else
+						return $this->codeMessage->getSuccessMessage(52);
+					else {
 						$this->ticketFactory->setCancelled($ticket);
+						return $this->codeMessage->getSuccessMessage(53);
+					}
 				} else
-					throw new NotFoundHttpException('Ticket with given ID does not exist or is not valid.');
+					return self::returnErrorResponse($this->codeMessage->getErrorMessage(18));
 			}
 		}
 
-		public function changeSeat()
+		public function changeSeat(): JsonResponse
 		{
 			$request = $this->requestStack->getCurrentRequest();
 			if (!$request->request->get("ticket_id") || !$request->request->get("new_seat_no"))
-				throw new NotFoundHttpException('Ticket id or new seat number is empty.');
-			else {
+				return self::returnErrorResponse($this->codeMessage->getErrorMessage(14));
+			else
+			{
 				$ticket = $this->entityManager->getRepository(Ticket::class)->findOneBy(['id' => $request->get('ticket_id')]);
 				if ($ticket) {
 					if ($this->entityManager->getRepository(Ticket::class)->findOneBy(['passengerSeat' => $request->request->get("new_seat_no")]))
-						throw new \Exception('This seat is already occupied. Please try another.');
-					if ($request->request->get("new_seat_no") < 1 || $request->request->get("new_seat_no") > 32)
-						throw new \Exception('You can only pick a seat between 1 and 32. Please try again.');
-
+						return self::returnErrorResponse($this->codeMessage->getErrorMessage(15));
+					if ($request->request->get("new_seat_no") < self::MINIMUM_SEAT_NUMBER || $request->request->get("new_seat_no") > self::MAXIMUM_SEAT_NUMBER)
+						return self::returnErrorResponse($this->codeMessage->getErrorMessage(16));
+					if (!is_numeric($request->request->get("new_seat_no")))
+						return self::returnErrorResponse($this->codeMessage->getErrorMessage(17));
 					$this->ticketFactory->setNewPassengerSeat($ticket, $request->request->get("new_seat_no"));
-				} else
-					throw new NotFoundHttpException('Ticket with given ID does not exist or is not valid.');
+					return self::returnSuccessResponse($this->codeMessage->getSuccessMessage(51));
+				}
+				else
+					return self::returnErrorResponse($this->codeMessage->getErrorMessage(18));
 			}
+		}
+
+		public function validateDateTime($dateStr, $format)
+		{
+			date_default_timezone_set('UTC');
+			$date = \DateTime::createFromFormat($format, $dateStr);
+			return $date && ($date->format($format) === $dateStr);
+		}
+
+		private function validatePostData($request)
+		{
+			if (!$request->request->get("from_airport"))
+				return $this->codeMessage->getErrorMessage(19);
+			if (!$request->request->get("to_airport"))
+				return $this->codeMessage->getErrorMessage(20);
+			if (!$request->request->get("passenger_passport_id"))
+				return $this->codeMessage->getErrorMessage(22);
+			if (!is_numeric($request->request->get("passenger_passport_id")))
+				return $this->codeMessage->getErrorMessage(23);
+			if (strlen($request->request->get("from_airport")) != self::AITA_LENGTH || strlen($request->request->get("to_airport")) != self::AITA_LENGTH)
+				return $this->codeMessage->getErrorMessage(24);
+			if (!$request->request->get("departure_time"))
+				return $this->codeMessage->getErrorMessage(25);
+		}
+
+		public function returnSuccessResponse($message): JsonResponse
+		{
+			return new JsonResponse(['data' => $message]);
+		}
+
+		public function returnErrorResponse($message): JsonResponse
+		{
+			return new JsonResponse(['error' => $message]);
 		}
 	}
