@@ -7,7 +7,12 @@ git clone git@github.com:MikeDrag/ticket_reservation_system.git
 ```
 ### Link to repo https://github.com/MikeDrag/ticket_reservation_system
 
-##### Make sure you have php 7.4 installed (.php-version file(7.4.32))
+### Make sure you have php 7.4 installed
+## Change php version
+Run `symfony local:php:list` to see the php installed versions in your system.
+`To control the version used in a directory, create a .php-version file that contains the version number (e.g. 7.2 or 7.2.15).
+`
+**Note: Remove .php-version file if not necessary or replace php with your version.**
 
 ## Install composer packages
 Run ```composer install```
